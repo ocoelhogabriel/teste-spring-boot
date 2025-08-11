@@ -1,19 +1,19 @@
 package com.ocoelho.service;
 
-import com.ocoelho.dto.LogFileDto;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.Instant;
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.ocoelho.dto.LogFileDto;
 
 @Service
 public class LogService {
@@ -25,22 +25,13 @@ public class LogService {
             return Page.empty(PageRequest.of(page, size));
         }
 
-        List<LogFileDto> files = Files.list(logDir)
-                .filter(Files::isRegularFile)
-                .map(p -> {
-                    try {
-                        return new LogFileDto(
-                                p.getFileName().toString(),
-                                Files.size(p),
-                                Files.getLastModifiedTime(p).toInstant()
-                        );
-                    } catch (IOException e) {
-                        return null;
-                    }
-                })
-                .filter(f -> f != null)
-                .sorted(Comparator.comparing(LogFileDto::lastModified).reversed())
-                .collect(Collectors.toList());
+        List<LogFileDto> files = Files.list(logDir).filter(Files::isRegularFile).map(p -> {
+            try {
+                return new LogFileDto(p.getFileName().toString(), Files.size(p), Files.getLastModifiedTime(p).toInstant());
+            } catch (IOException e) {
+                return null;
+            }
+        }).filter(f -> f != null).sorted(Comparator.comparing(LogFileDto::lastModified).reversed()).collect(Collectors.toList());
 
         int from = Math.min(page * size, files.size());
         int to = Math.min(from + size, files.size());

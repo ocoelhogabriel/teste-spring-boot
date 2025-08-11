@@ -1,17 +1,16 @@
 package com.ocoelho.service;
 
-import jakarta.annotation.PostConstruct;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
-
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-@Component
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
+
+import jakarta.annotation.PostConstruct;
+
 public class LogTailService {
 
     private final SimpMessagingTemplate messagingTemplate;
