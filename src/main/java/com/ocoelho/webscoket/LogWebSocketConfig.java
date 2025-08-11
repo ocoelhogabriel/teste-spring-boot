@@ -9,12 +9,12 @@ import com.ocoelho.properties.AppLoggingProperties;
 
 @Configuration
 @EnableWebSocket
-public class WebSocketConfig implements WebSocketConfigurer {
+public class LogWebSocketConfig implements WebSocketConfigurer {
 
     private final LogStreamWebSocketHandler logStreamWebSocketHandler;
     private final AppLoggingProperties appLoggingProperties;
 
-    public WebSocketConfig(LogStreamWebSocketHandler logStreamWebSocketHandler, AppLoggingProperties appLoggingProperties) {
+    public LogWebSocketConfig(LogStreamWebSocketHandler logStreamWebSocketHandler, AppLoggingProperties appLoggingProperties) {
         this.logStreamWebSocketHandler = logStreamWebSocketHandler;
         this.appLoggingProperties = appLoggingProperties;
     }
