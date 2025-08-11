@@ -1,32 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="DEBUG">
+<Configuration status="DEBUG" packages="com.ocoelho.webscoket">
 	<Properties>
 		<Property name="applicationName">application</Property>
-		<Property name="logPath">log</Property>
+                <Property name="logPath">logs</Property>
 		<Property name="pattern">%d{yyyy-MM-dd HH:mm:ss.SSS} | %-5level | PID[%pid] | Th[%thread] - Cl[%c{1}] > %msg%n</Property>
 		<Property name="logPattern">%d{yyyy-MM-dd HH:mm:ss.SSS} | %-5level | PID[%pid] | Th[%thread] - Cl[%c{1}] > %msg%n</Property>
 	</Properties>
 
-	<Appenders>
-		<Console name="LogToConsole" target="SYSTEM_OUT">
-			<PatternLayout pattern="${pattern}" />
-		</Console>
+        <Appenders>
+                <Console name="LogToConsole" target="SYSTEM_OUT">
+                        <PatternLayout pattern="${pattern}" />
+                </Console>
 
-		<RollingFile name="RollingFileAppender" fileName="${logPath}/${applicationName}.log" filePattern="${logPath}/archive/${applicationName}-%d{yyyy-MM-dd}-%i.log.gz" createOnDemand="true">
-			<PatternLayout pattern="${logPattern}" />
-			<Policies>
-				<TimeBasedTriggeringPolicy interval="1" modulate="true" />
-				<SizeBasedTriggeringPolicy size="50MB" />
-			</Policies>
-			<DefaultRolloverStrategy max="30" />
-		</RollingFile>
-	</Appenders>
+                <RollingFile name="RollingFileAppender" fileName="${logPath}/${applicationName}.log" filePattern="${logPath}/archive/${applicationName}-%d{yyyy-MM-dd}-%i.log.gz" createOnDemand="true">
+                        <PatternLayout pattern="${logPattern}" />
+                        <Policies>
+                                <TimeBasedTriggeringPolicy interval="1" modulate="true" />
+                                <SizeBasedTriggeringPolicy size="50MB" />
+                        </Policies>
+                        <DefaultRolloverStrategy max="30" />
+                </RollingFile>
+
+                <WebSocketAppender name="WebSocketAppender">
+                        <PatternLayout pattern="${logPattern}" />
+                </WebSocketAppender>
+        </Appenders>
 
 	<Loggers>
-		<Root level="INFO">
-			<!-- Os refs PRECISAM bater com os 'name' lá em cima -->
-			<AppenderRef ref="LogToConsole" />
-			<AppenderRef ref="RollingFileAppender" />
-		</Root>
-	</Loggers>
+                <Root level="INFO">
+                        <!-- Os refs PRECISAM bater com os 'name' lá em cima -->
+                        <AppenderRef ref="LogToConsole" />
+                        <AppenderRef ref="RollingFileAppender" />
+                        <AppenderRef ref="WebSocketAppender" />
+                </Root>
+        </Loggers>
 </Configuration>

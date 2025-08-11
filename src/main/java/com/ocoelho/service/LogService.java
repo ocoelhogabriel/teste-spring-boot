@@ -3,7 +3,6 @@ package com.ocoelho.service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -14,11 +13,16 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import com.ocoelho.dto.LogFileDto;
+import com.ocoelho.properties.AppLoggingProperties;
 
 @Service
 public class LogService {
 
-    private final Path logDir = Paths.get("log");
+    private final Path logDir;
+
+    public LogService(AppLoggingProperties properties) {
+        this.logDir = properties.getDir();
+    }
 
     public Page<LogFileDto> list(int page, int size) throws IOException {
         if (Files.notExists(logDir)) {

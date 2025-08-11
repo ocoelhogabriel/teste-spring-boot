@@ -14,7 +14,7 @@ import jakarta.annotation.PostConstruct;
 public class LogTailService {
 
     private final SimpMessagingTemplate messagingTemplate;
-    private final Path logFile = Paths.get("log/application.log");
+    private final Path logFile = Paths.get("logs/application.log");
     private long filePointer = 0L;
 
     public LogTailService(SimpMessagingTemplate messagingTemplate) {
