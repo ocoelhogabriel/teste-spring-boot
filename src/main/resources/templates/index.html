@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log Manager - Spring Boot</title>
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet"
+	href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+	<div class="container">
+		<header class="header">
+			<div class="logo">
+				<img src="/images/logo.png" alt="Log Manager">
+				<h1>Log Manager</h1>
+			</div>
+			<div class="controls">
+				<button id="toggle-live" class="btn btn-primary">
+					<i class="fas fa-play"></i> Live Logs
+				</button>
+				<button id="refresh-logs" class="btn btn-secondary">
+					<i class="fas fa-sync-alt"></i> Refresh
+				</button>
+				<div class="filter-controls">
+					<select id="log-level">
+						<option value="ALL">All Levels</option>
+						<option value="INFO">INFO</option>
+						<option value="WARN">WARN</option>
+						<option value="ERROR">ERROR</option>
+						<option value="DEBUG">DEBUG</option>
+						<option value="TRACE">TRACE</option>
+					</select> <input type="text" id="log-search" placeholder="Search logs...">
+				</div>
+			</div>
+		</header>
+
+		<div class="content">
+			<aside class="sidebar">
+				<h2>Log Files</h2>
+				<ul id="log-files-list" class="file-list">
+					<!-- Populated by JavaScript -->
+				</ul>
+				<div class="date-filter">
+					<h3>Filter by Date</h3>
+					<input type="date" id="log-date">
+				</div>
+			</aside>
+
+			<main class="log-viewer">
+				<div class="log-toolbar">
+					<button id="download-log" class="btn btn-secondary" disabled>
+						<i class="fas fa-download"></i> Download
+					</button>
+					<button id="clear-logs" class="btn btn-danger">
+						<i class="fas fa-trash"></i> Clear
+					</button>
+					<span class="log-info" id="log-file-info">No file selected</span>
+				</div>
+				<div class="log-container">
+					<pre id="log-content"></pre>
+				</div>
+				<div class="log-status">
+					<span id="log-status">Ready</span> <span id="line-count">0
+						lines</span>
+				</div>
+			</main>
+		</div>
+	</div>
+
+	<script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const logContent = document.getElementById('log-content');
+            const logFilesList = document.getElementById('log-files-list');
+            const toggleLiveBtn = document.getElementById('toggle-live');
+            const refreshLogsBtn = document.getElementById('refresh-logs');
+            const downloadLogBtn = document.getElementById('download-log');
+            const clearLogsBtn = document.getElementById('clear-logs');
+            const logLevelSelect = document.getElementById('log-level');
+            const logSearch = document.getElementById('log-search');
+            const logDate = document.getElementById('log-date');
+            const logFileInfo = document.getElementById('log-file-info');
+            const logStatus = document.getElementById('log-status');
+            const lineCount = document.getElementById('line-count');
+
+            // State
+            let currentLogFile = null;
+            let liveLogsEnabled = false;
+            let eventSource = null;
+            let logsData = [];
+            let filteredLogs = [];
+
+            // Initialize
+            loadLogFiles();
+            setupEventListeners();
+
+            function setupEventListeners() {
+                toggleLiveBtn.addEventListener('click', toggleLiveLogs);
+                refreshLogsBtn.addEventListener('click', loadLogFiles);
+                downloadLogBtn.addEventListener('click', downloadCurrentLog);
+                clearLogsBtn.addEventListener('click', clearLogViewer);
+                logLevelSelect.addEventListener('change', filterLogs);
+                logSearch.addEventListener('input', filterLogs);
+                logDate.addEventListener('change', filterByDate);
+            }
+
+            async function loadLogFiles() {
+                try {
+                    updateStatus('Loading log files...');
+                    const response = await fetch('/api/logs/files');
+                    if (!response.ok) throw new Error('Failed to load log files');
+
+                    const files = await response.json();
+                    renderLogFiles(files);
+                    updateStatus('Log files loaded');
+                } catch (error) {
+                    console.error('Error loading log files:', error);
+                    updateStatus('Error loading log files', 'error');
+                }
+            }
+
+            function renderLogFiles(files) {
+                logFilesList.innerHTML = '';
+                files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.textContent = file.name;
+                    li.dataset.file = file.name;
+                    li.addEventListener('click', () => loadLogFile(file.name));
+                    logFilesList.appendChild(li);
+                });
+            }
+
+            async function loadLogFile(filename) {
+                try {
+                    updateStatus(`Loading ${filename}...`);
+                    currentLogFile = filename;
+                    logFileInfo.textContent = filename;
+
+                    // Highlight selected file
+                    document.querySelectorAll('#log-files-list li').forEach(li => {
+                        li.classList.toggle('active', li.dataset.file === filename);
+                    });
+
+                    const response = await fetch(`/api/logs/file?name=${encodeURIComponent(filename)}`);
+                    if (!response.ok) throw new Error('Failed to load log file');
+
+                    const text = await response.text();
+                    logsData = text.split('\n');
+                    renderLogs(logsData);
+                    updateStatus(`${filename} loaded`);
+                    downloadLogBtn.disabled = false;
+                    
+                    // If live mode is active, restart it with new file
+                    if (liveLogsEnabled) {
+                        stopLiveLogs();
+                        startLiveLogs();
+                    }
+                } catch (error) {
+                    console.error('Error loading log file:', error);
+                    updateStatus(`Error loading ${filename}`, 'error');
+                }
+            }
+
+            function renderLogs(logLines) {
+                logContent.innerHTML = '';
+                let count = 0;
+
+                logLines.forEach(line => {
+                    if (!line.trim()) return;
+
+                    const div = document.createElement('div');
+                    div.className = 'log-line';
+
+                    // Extract log level for styling
+                    const levelMatch = line.match(/\[(INFO|WARN|ERROR|DEBUG|TRACE)\]/);
+                    if (levelMatch) {
+                        const level = levelMatch[1];
+                        div.classList.add(`log-level-${level}`);
+                    }
+
+                    div.textContent = line;
+                    logContent.appendChild(div);
+                    count++;
+                });
+
+                lineCount.textContent = `${count} lines`;
+                filteredLogs = logLines;
+            }
+
+            function filterLogs() {
+                if (!logsData.length && !liveLogsEnabled) return;
+
+                const level = logLevelSelect.value;
+                const searchTerm = logSearch.value.toLowerCase();
+
+                if (liveLogsEnabled) {
+                    // Filter existing displayed logs
+                    const logLines = Array.from(logContent.children).map(div => div.textContent);
+                    filteredLogs = logLines.filter(line => {
+                        const matchesLevel = level === 'ALL' || line.includes(`[${level}]`);
+                        const matchesSearch = !searchTerm || line.toLowerCase().includes(searchTerm);
+                        return matchesLevel && matchesSearch;
+                    });
+                    
+                    // Re-render filtered content
+                    logContent.innerHTML = '';
+                    filteredLogs.forEach(line => {
+                        const div = document.createElement('div');
+                        div.className = 'log-line';
+                        const levelMatch = line.match(/\[(INFO|WARN|ERROR|DEBUG|TRACE)\]/);
+                        if (levelMatch) {
+                            div.classList.add(`log-level-${levelMatch[1]}`);
+                        }
+                        div.textContent = line;
+                        logContent.appendChild(div);
+                    });
+                } else {
+                    // Filter the full log data
+                    filteredLogs = logsData.filter(line => {
+                        const matchesLevel = level === 'ALL' || line.includes(`[${level}]`);
+                        const matchesSearch = !searchTerm || line.toLowerCase().includes(searchTerm);
+                        return matchesLevel && matchesSearch;
+                    });
+                    renderLogs(filteredLogs);
+                }
+            }
+
+            function filterByDate() {
+                if (!logsData.length || !logDate.value) {
+                    if (liveLogsEnabled) {
+                        // If in live mode, just reset the filter
+                        filterLogs();
+                    } else {
+                        renderLogs(logsData);
+                    }
+                    return;
+                }
+
+                const selectedDate = new Date(logDate.value);
+                const dateString = selectedDate.toISOString().split('T')[0];
+
+                filteredLogs = logsData.filter(line => {
+                    return line.includes(dateString);
+                });
+
+                renderLogs(filteredLogs);
+            }
+
+            function toggleLiveLogs() {
+                liveLogsEnabled = !liveLogsEnabled;
+
+                if (liveLogsEnabled) {
+                    startLiveLogs();
+                    toggleLiveBtn.innerHTML = '<i class="fas fa-stop"></i> Stop Live';
+                    toggleLiveBtn.classList.remove('btn-primary');
+                    toggleLiveBtn.classList.add('btn-danger');
+                    updateStatus('Live mode activated');
+                } else {
+                    stopLiveLogs();
+                    toggleLiveBtn.innerHTML = '<i class="fas fa-play"></i> Live Logs';
+                    toggleLiveBtn.classList.remove('btn-danger');
+                    toggleLiveBtn.classList.add('btn-primary');
+                    updateStatus('Live mode deactivated');
+                }
+            }
+
+            function startLiveLogs() {
+                if (eventSource) eventSource.close();
+
+                // Limpa o conteúdo atual ao iniciar o modo live
+                logContent.innerHTML = '';
+                lineCount.textContent = '0 lines';
+
+                // Inclui o arquivo atual e nível de log na URL
+                const fileParam = currentLogFile ? `file=${encodeURIComponent(currentLogFile)}` : '';
+                const levelParam = logLevelSelect.value !== 'ALL' ? `level=${logLevelSelect.value}` : '';
+                
+                let url = '/api/logs/stream';
+                if (fileParam || levelParam) {
+                    url += '?' + [fileParam, levelParam].filter(p => p).join('&');
+                }
+
+                eventSource = new EventSource(url);
+
+                eventSource.onmessage = function(event) {
+                    const logLine = event.data;
+                    if (shouldDisplayLine(logLine, logLevelSelect.value, logSearch.value.toLowerCase())) {
+                        addLogLine(logLine);
+                    }
+                };
+
+                eventSource.onopen = function() {
+                    updateStatus('Live stream connected', 'success');
+                };
+
+                eventSource.onerror = function() {
+                    console.error('Error in SSE connection');
+                    updateStatus('Connection to server lost', 'error');
+                    stopLiveLogs();
+                    
+                    // Tenta reconectar após 5 segundos
+                    setTimeout(() => {
+                        if (liveLogsEnabled) {
+                            updateStatus('Attempting to reconnect...');
+                            startLiveLogs();
+                        }
+                    }, 5000);
+                };
+            }
+
+
+            function shouldDisplayLine(line, level, searchTerm) {
+                // Verifica se a linha corresponde ao nível selecionado
+                const levelMatch = level === 'ALL' || line.includes(`[${level}]`);
+                
+                // Verifica se a linha contém o termo de busca
+                const searchMatch = !searchTerm || line.toLowerCase().includes(searchTerm);
+                
+                return levelMatch && searchMatch;
+            }
+
+            function addLogLine(line) {
+                if (!line.trim()) return;
+
+                const div = document.createElement('div');
+                div.className = 'log-line';
+
+                // Detecta e aplica estilo baseado no nível do log
+                if (line.includes('[INFO]')) {
+                    div.classList.add('log-level-INFO');
+                } else if (line.includes('[WARN]')) {
+                    div.classList.add('log-level-WARN');
+                } else if (line.includes('[ERROR]')) {
+                    div.classList.add('log-level-ERROR');
+                } else if (line.includes('[DEBUG]')) {
+                    div.classList.add('log-level-DEBUG');
+                } else if (line.includes('[TRACE]')) {
+                    div.classList.add('log-level-TRACE');
+                }
+
+                // Remove códigos de cor ANSI (cores do console)
+                const cleanLine = line.replace(/\x1B\[[0-9;]*[mGK]/g, '');
+                div.textContent = cleanLine;
+                
+                // Adiciona no topo (logs mais recentes primeiro)
+                logContent.insertBefore(div, logContent.firstChild);
+                
+                // Atualiza contador de linhas
+                const currentCount = parseInt(lineCount.textContent) || 0;
+                lineCount.textContent = currentCount + 1 + ' lines';
+                
+                // Mantém um limite máximo de linhas para performance
+                if (logContent.children.length > 1000) {
+                    logContent.removeChild(logContent.lastChild);
+                }
+            }
+
+            function stopLiveLogs() {
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+            }
+
+            function downloadCurrentLog() {
+                if (!currentLogFile || (!filteredLogs.length && !liveLogsEnabled)) return;
+
+                let content;
+                if (liveLogsEnabled) {
+                    // Get all currently displayed lines
+                    content = Array.from(logContent.children)
+                        .map(div => div.textContent)
+                        .join('\n');
+                } else {
+                    content = filteredLogs.join('\n');
+                }
+
+                const blob = new Blob([content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = currentLogFile.replace('.log', '_filtered.log') || 'logs.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            function clearLogViewer() {
+                logContent.innerHTML = '';
+                logsData = [];
+                filteredLogs = [];
+                lineCount.textContent = '0 lines';
+                logFileInfo.textContent = 'No file selected';
+                downloadLogBtn.disabled = true;
+
+                document.querySelectorAll('#log-files-list li').forEach(li => {
+                    li.classList.remove('active');
+                });
+
+                currentLogFile = null;
+                updateStatus('Log viewer cleared');
+                
+                // If in live mode, stop it
+                if (liveLogsEnabled) {
+                    stopLiveLogs();
+                    liveLogsEnabled = false;
+                    toggleLiveBtn.innerHTML = '<i class="fas fa-play"></i> Live Logs';
+                    toggleLiveBtn.classList.remove('btn-danger');
+                    toggleLiveBtn.classList.add('btn-primary');
+                }
+            }
+
+            function updateStatus(message, type = 'info') {
+                logStatus.textContent = message;
+                logStatus.className = '';
+
+                if (type === 'error') {
+                    logStatus.style.color = '#f44336';
+                } else if (type === 'success') {
+                    logStatus.style.color = '#4caf50';
+                } else {
+                    logStatus.style.color = '#607d8b';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
