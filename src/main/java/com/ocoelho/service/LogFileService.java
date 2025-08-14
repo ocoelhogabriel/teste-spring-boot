@@ -106,6 +106,39 @@ public class LogFileService {
         }
     }
 
+    /**
+     * Procura por linhas que correspondam a uma expressão regular em todo o arquivo
+     * de log. A busca é feita de forma sequencial e para no momento em que o
+     * número máximo de resultados (limit) é atingido.
+     */
+    public List<String> searchLines(String requestedFileName, String regexFilter, int limit) throws IOException {
+        validateFileName(requestedFileName);
+        if (regexFilter == null || regexFilter.isBlank()) {
+            return List.of();
+        }
+        Pattern pattern = Pattern.compile(regexFilter);
+        if (limit <= 0) {
+            limit = Integer.MAX_VALUE;
+        }
+
+        try (InputStream in = openLogFileStreamSecure(requestedFileName);
+                InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8);
+                BufferedReader bufferedReader = new BufferedReader(reader)) {
+
+            List<String> matches = new ArrayList<>();
+            String line;
+            while ((line = bufferedReader.readLine()) != null) {
+                if (pattern.matcher(line).find()) {
+                    matches.add(line);
+                    if (matches.size() >= limit) {
+                        break;
+                    }
+                }
+            }
+            return matches;
+        }
+    }
+
     private void validateFileName(String fileName) {
         if (fileName == null || fileName.isBlank()) {
             throw new IllegalArgumentException("Nome de arquivo invalido.");

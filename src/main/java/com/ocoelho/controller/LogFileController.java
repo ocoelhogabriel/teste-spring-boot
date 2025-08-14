@@ -20,7 +20,13 @@ import com.ocoelho.service.LogFileInfoDTO;
 import com.ocoelho.service.LogFileService;
 
 /**
- * Endpoints para suporte técnico: - Listar arquivos - Visualizar trecho (tail) com filtros - Baixar arquivo .log ou .log.gz
+ * API REST para manipulação de arquivos de log. Permite:
+ * <ul>
+ *   <li>Listar arquivos disponíveis;</li>
+ *   <li>Buscar informações em um arquivo;</li>
+ *   <li>Visualizar trecho recente (tail) com filtro opcional;</li>
+ *   <li>Efetuar download do arquivo completo.</li>
+ * </ul>
  */
 @RestController
 @RequestMapping("/logs")
@@ -47,6 +53,17 @@ public class LogFileController {
     public List<String> viewTail(@RequestParam("file") String fileName, @RequestParam(required = false, defaultValue = "200") int limit,
             @RequestParam(required = false) String grepRegex) throws Exception {
         return logFileService.tailWithFilter(fileName, limit, grepRegex);
+    }
+
+    /**
+     * Busca por linhas que contenham a expressão regular informada em todo o arquivo de log.
+     * Exemplo: GET /logs/search?file=application.log&grep=ERROR&limit=500
+     */
+    @GetMapping("/search")
+    public List<String> search(@RequestParam("file") String fileName,
+                               @RequestParam("grep") String grepRegex,
+                               @RequestParam(required = false, defaultValue = "100") int limit) throws Exception {
+        return logFileService.searchLines(fileName, grepRegex, limit);
     }
 
     /**
